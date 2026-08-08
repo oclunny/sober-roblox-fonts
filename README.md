@@ -19,7 +19,7 @@ This works by creating an asset overlay instead of modifying the Roblox APK dire
 ## Requirements
 
 - Linux
-- [Sober](https://sober.vinegarhq.org/), installed and launched at least once
+- [Sober](https://flathub.org/en/apps/org.vinegarhq.Sober/), installed and launched at least once
 - `unzip`
 - `python3`
 - `sed`

@@ -83,7 +83,7 @@ Once you're done, the script offers to delete the cloned repo folder for you, si
 ## Notes
 
 - Some Roblox experiences load or download their own fonts, so those may not follow the replacement.
-- The font file doesn't need to stay in `~/Downloads` after installation — it's already been copied into the Sober overlay by that point.
+- The font file doesn't need to stay in `~/Downloads` after installation it's already been copied into the Sober overlay by that point.
 
 ---
 

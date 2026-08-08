@@ -5,21 +5,51 @@ set -euo pipefail
 # Linux / Sober (VinegarHQ)
 #
 # What it does:
-# 1. Looks for font files in ~/Downloads.
+# 1. Looks for font files anywhere in ~/Downloads (including subfolders).
 # 2. Lets you choose a font interactively.
-# 3. Backs up the existing Sober asset overlay.
+# 3. Backs up the existing Sober asset overlay (optional).
 # 4. Extracts Roblox's font-family JSON files from base.apk.
 # 5. Replaces every non-emoji font family with your chosen font.
 # 6. Leaves emoji-related fonts/families alone.
+# 7. Offers to delete this cloned repo folder once you're done.
 #
-# Run from a terminal:
-#   chmod +x change-font.sh
-#   ./change-font.sh
+# Run from a terminal, right after cloning oclunny/sober-roblox-fonts:
+#   chmod +x change-font-byclunny.sh
+#   ./change-font-byclunny.sh
 
 SOBER="$HOME/.var/app/org.vinegarhq.Sober/data/sober"
 OVERLAY="$SOBER/asset_overlay"
 APK="$SOBER/packages/x86_64/com.roblox.client/base.apk"
 DOWNLOADS="$HOME/Downloads"
+
+# Folder this script lives in (i.e. the cloned repo), used later for the
+# optional cleanup step. Resolved this way so it still works no matter
+# where the repo was cloned to.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ---------------------------------------------------------------------------
+# Basic dependency / sanity checks (kept simple for beginners on a fresh PC)
+# ---------------------------------------------------------------------------
+
+MISSING=()
+command -v unzip  >/dev/null 2>&1 || MISSING+=("unzip")
+command -v python3 >/dev/null 2>&1 || MISSING+=("python3")
+command -v find   >/dev/null 2>&1 || MISSING+=("find")
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+    echo "ERROR: The following required tools are missing:"
+    for tool in "${MISSING[@]}"; do
+        echo "  - $tool"
+    done
+    echo
+    echo "Install them with your distro's package manager, for example:"
+    echo "  Debian/Ubuntu:  sudo apt install ${MISSING[*]}"
+    echo "  Fedora:         sudo dnf install ${MISSING[*]}"
+    echo "  Arch:           sudo pacman -S ${MISSING[*]}"
+    echo
+    echo "Then run this script again."
+    exit 1
+fi
 
 if [[ ! -f "$APK" ]]; then
     echo "ERROR: Roblox base.apk was not found:"
@@ -29,11 +59,35 @@ if [[ ! -f "$APK" ]]; then
     exit 1
 fi
 
-if ! command -v unzip >/dev/null 2>&1; then
-    echo "ERROR: unzip is required."
-    echo "Install it with your distro's package manager, then run this again."
-    exit 1
-fi
+# ---------------------------------------------------------------------------
+# Helper: offer to delete this cloned repo folder
+# ---------------------------------------------------------------------------
+
+offer_repo_cleanup() {
+    echo
+    echo "This script lives in the cloned repo folder:"
+    echo "  $SCRIPT_DIR"
+    echo
+
+    if [[ ! -d "$SCRIPT_DIR/.git" ]]; then
+        echo "(This doesn't look like a git repo folder, so cleanup is skipped"
+        echo " automatically. You can still delete it manually if you want.)"
+        return
+    fi
+
+    read -r -p "Delete this cloned repo folder now that you're done? [y/N]: " DELETE_REPO
+    if [[ "$DELETE_REPO" =~ ^[Yy]$ ]]; then
+        echo
+        echo "Deleting:"
+        echo "  $SCRIPT_DIR"
+        cd "$HOME"
+        rm -rf "$SCRIPT_DIR"
+        echo "Repo folder deleted. All done!"
+    else
+        echo "Keeping the repo folder. You can delete it manually any time,"
+        echo "or re-run this script later to change fonts again."
+    fi
+}
 
 echo
 echo "=========================================="
@@ -53,7 +107,7 @@ if [[ "$ACTION" == "2" ]]; then
     echo
 
     mapfile -t BACKUPS < <(
-        find "$SOBER" -maxdepth 1 -mindepth 1 -type d             -name 'font-backup-*' -printf '%f\n' | sort -r
+        find "$SOBER" -maxdepth 1 -mindepth 1 -type d -name 'font-backup-*' -printf '%f\n' | sort -r
     )
 
     if [[ ${#BACKUPS[@]} -eq 0 ]]; then
@@ -97,6 +151,9 @@ if [[ "$ACTION" == "2" ]]; then
     echo
     echo "Restore complete!"
     echo "Start Sober normally to use the restored fonts."
+
+    offer_repo_cleanup
+
     echo
     echo "Created with ❤️ by clunny"
     echo
@@ -109,21 +166,28 @@ if [[ "$ACTION" != "1" ]]; then
 fi
 
 echo
-echo "Font files must be in:"
+echo "Font files can be anywhere inside:"
 echo "  $DOWNLOADS"
+echo "(including subfolders, e.g. $DOWNLOADS/MyFont/)"
 echo
 
-# Find usable font files directly in Downloads.
+if [[ ! -d "$DOWNLOADS" ]]; then
+    echo "ERROR: Downloads folder was not found:"
+    echo "  $DOWNLOADS"
+    exit 1
+fi
+
+# Find usable font files anywhere in Downloads, including subfolders.
 mapfile -d '' FONTS < <(
-    find "$DOWNLOADS" -maxdepth 1 -type f \
+    find "$DOWNLOADS" -type f \
         \( -iname '*.ttf' -o -iname '*.otf' -o -iname '*.ttc' \) \
         -print0 | sort -z
 )
 
 if [[ ${#FONTS[@]} -eq 0 ]]; then
-    echo "No .ttf, .otf, or .ttc fonts were found in Downloads."
+    echo "No .ttf, .otf, or .ttc fonts were found in Downloads or its subfolders."
     echo
-    echo "Put your font file directly in ~/Downloads and run this again."
+    echo "Put your font file somewhere inside ~/Downloads and run this again."
     exit 1
 fi
 
@@ -131,7 +195,10 @@ echo "Found these fonts:"
 echo
 
 for i in "${!FONTS[@]}"; do
-    printf "  [%d] %s\n" "$((i + 1))" "$(basename "${FONTS[$i]}")"
+    # Show the path relative to Downloads so fonts in subfolders are
+    # easy to tell apart from ones with the same filename.
+    REL="${FONTS[$i]#"$DOWNLOADS"/}"
+    printf "  [%d] %s\n" "$((i + 1))" "$REL"
 done
 
 echo
@@ -152,8 +219,8 @@ echo
 
 # Show basic font metadata if fontconfig tools are installed.
 if command -v fc-scan >/dev/null 2>&1; then
-    FAMILY="$(fc-scan --format='%{family}\\n' "$FONT" 2>/dev/null | head -n 1 || true)"
-    STYLE="$(fc-scan --format='%{style}\\n' "$FONT" 2>/dev/null | head -n 1 || true)"
+    FAMILY="$(fc-scan --format='%{family}\n' "$FONT" 2>/dev/null | head -n 1 || true)"
+    STYLE="$(fc-scan --format='%{style}\n' "$FONT" 2>/dev/null | head -n 1 || true)"
     [[ -n "$FAMILY" ]] && echo "Font family: $FAMILY"
     [[ -n "$STYLE" ]] && echo "Font style:  $STYLE"
     echo
@@ -305,13 +372,17 @@ echo
 echo "Start Sober normally and test Roblox."
 echo
 echo "If you want to undo this change, remove the overlay and restore"
-echo "the backup shown above."
+echo "the backup shown above (or re-run this script and choose option [2])."
 echo
 echo "IMPORTANT:"
-echo "- Keep the font file in ~/Downloads when you run this script."
+echo "- The font file no longer needs to stay in ~/Downloads after this,"
+echo "  since it has already been copied into the Sober overlay."
 echo "- Emoji fonts are intentionally not replaced."
 echo "- Some Roblox experiences can load/download their own fonts,"
 echo "  so those may not follow the replacement."
+
+offer_repo_cleanup
+
 echo
 echo "Created with ❤️ by clunny"
 echo

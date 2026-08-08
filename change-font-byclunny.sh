@@ -28,27 +28,121 @@ DOWNLOADS="$HOME/Downloads"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
-# Basic dependency / sanity checks (kept simple for beginners on a fresh PC)
+# Basic dependency check, with an offer to auto-install anything missing
+# (kept simple for beginners running this on a fresh PC for the first time)
 # ---------------------------------------------------------------------------
 
+# Tools this script relies on, and the package name that provides each one
+# per package manager. `find` is part of core/findutils and is essentially
+# always present, so it isn't offered for auto-install below.
+declare -A PKG_APT=( [unzip]="unzip" [python3]="python3" [sed]="sed" )
+declare -A PKG_DNF=( [unzip]="unzip" [python3]="python3" [sed]="sed" )
+declare -A PKG_PACMAN=( [unzip]="unzip" [python3]="python" [sed]="sed" )
+declare -A PKG_ZYPPER=( [unzip]="unzip" [python3]="python3" [sed]="sed" )
+declare -A PKG_APK=( [unzip]="unzip" [python3]="python3" [sed]="sed" )
+
 MISSING=()
-command -v unzip  >/dev/null 2>&1 || MISSING+=("unzip")
+command -v unzip   >/dev/null 2>&1 || MISSING+=("unzip")
 command -v python3 >/dev/null 2>&1 || MISSING+=("python3")
-command -v find   >/dev/null 2>&1 || MISSING+=("find")
+command -v sed     >/dev/null 2>&1 || MISSING+=("sed")
+command -v find    >/dev/null 2>&1 || MISSING+=("find")
+
+echo "Checking required tools (unzip, python3, sed, find)..."
+
+if [[ ${#MISSING[@]} -eq 0 ]]; then
+    echo "All required tools are already installed. Continuing..."
+    echo
+fi
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-    echo "ERROR: The following required tools are missing:"
+    echo "This script needs a few command-line tools that aren't installed:"
     for tool in "${MISSING[@]}"; do
         echo "  - $tool"
     done
     echo
-    echo "Install them with your distro's package manager, for example:"
-    echo "  Debian/Ubuntu:  sudo apt install ${MISSING[*]}"
-    echo "  Fedora:         sudo dnf install ${MISSING[*]}"
-    echo "  Arch:           sudo pacman -S ${MISSING[*]}"
-    echo
-    echo "Then run this script again."
-    exit 1
+    read -r -p "Install the missing packages now? [Y/n]: " INSTALL_DEPS
+
+    if [[ "$INSTALL_DEPS" =~ ^[Nn]$ ]]; then
+        echo
+        echo "Skipping package installation. Continuing on to the font script..."
+        echo "(If a missing tool is actually needed, a step further down will fail"
+        echo " and tell you which one.)"
+    else
+        # Figure out which package manager is available and build the list
+        # of package names to install for it.
+        SUDO=""
+        if [[ "$(id -u)" -ne 0 ]]; then
+            if command -v sudo >/dev/null 2>&1; then
+                SUDO="sudo"
+            else
+                echo
+                echo "ERROR: Not running as root and 'sudo' isn't available,"
+                echo "so packages can't be installed automatically."
+                echo "Please install the tools listed above manually, then run"
+                echo "this script again."
+                exit 1
+            fi
+        fi
+
+        INSTALL_CMD=()
+        if command -v apt-get >/dev/null 2>&1; then
+            PKGS=(); for t in "${MISSING[@]}"; do [[ -n "${PKG_APT[$t]:-}" ]] && PKGS+=("${PKG_APT[$t]}"); done
+            INSTALL_CMD=($SUDO apt-get update -y "&&" $SUDO apt-get install -y "${PKGS[@]}")
+            echo
+            echo "Detected apt (Debian/Ubuntu). Running:"
+            echo "  $SUDO apt-get update -y && $SUDO apt-get install -y ${PKGS[*]}"
+            $SUDO apt-get update -y
+            $SUDO apt-get install -y "${PKGS[@]}"
+        elif command -v dnf >/dev/null 2>&1; then
+            PKGS=(); for t in "${MISSING[@]}"; do [[ -n "${PKG_DNF[$t]:-}" ]] && PKGS+=("${PKG_DNF[$t]}"); done
+            echo
+            echo "Detected dnf (Fedora). Running:"
+            echo "  $SUDO dnf install -y ${PKGS[*]}"
+            $SUDO dnf install -y "${PKGS[@]}"
+        elif command -v pacman >/dev/null 2>&1; then
+            PKGS=(); for t in "${MISSING[@]}"; do [[ -n "${PKG_PACMAN[$t]:-}" ]] && PKGS+=("${PKG_PACMAN[$t]}"); done
+            echo
+            echo "Detected pacman (Arch). Running:"
+            echo "  $SUDO pacman -S --noconfirm ${PKGS[*]}"
+            $SUDO pacman -S --noconfirm "${PKGS[@]}"
+        elif command -v zypper >/dev/null 2>&1; then
+            PKGS=(); for t in "${MISSING[@]}"; do [[ -n "${PKG_ZYPPER[$t]:-}" ]] && PKGS+=("${PKG_ZYPPER[$t]}"); done
+            echo
+            echo "Detected zypper (openSUSE). Running:"
+            echo "  $SUDO zypper install -y ${PKGS[*]}"
+            $SUDO zypper install -y "${PKGS[@]}"
+        elif command -v apk >/dev/null 2>&1; then
+            PKGS=(); for t in "${MISSING[@]}"; do [[ -n "${PKG_APK[$t]:-}" ]] && PKGS+=("${PKG_APK[$t]}"); done
+            echo
+            echo "Detected apk (Alpine). Running:"
+            echo "  $SUDO apk add ${PKGS[*]}"
+            $SUDO apk add "${PKGS[@]}"
+        else
+            echo
+            echo "ERROR: Couldn't detect a supported package manager"
+            echo "(apt, dnf, pacman, zypper, or apk)."
+            echo
+            echo "Please install these manually, then run this script again:"
+            printf '  %s\n' "${MISSING[@]}"
+            exit 1
+        fi
+
+        # Re-check after attempting install.
+        STILL_MISSING=()
+        command -v unzip   >/dev/null 2>&1 || STILL_MISSING+=("unzip")
+        command -v python3 >/dev/null 2>&1 || STILL_MISSING+=("python3")
+        command -v sed     >/dev/null 2>&1 || STILL_MISSING+=("sed")
+
+        if [[ ${#STILL_MISSING[@]} -gt 0 ]]; then
+            echo
+            echo "WARNING: Still missing after install attempt:"
+            printf '  - %s\n' "${STILL_MISSING[@]}"
+            echo "You may need to install these by hand before continuing."
+        else
+            echo
+            echo "All required packages are installed."
+        fi
+    fi
 fi
 
 if [[ ! -f "$APK" ]]; then

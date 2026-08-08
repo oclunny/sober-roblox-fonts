@@ -25,7 +25,7 @@ This works by creating an asset overlay instead of modifying the Roblox APK dire
 - `sed`
 - A `.ttf`, `.otf`, or `.ttc` font you are allowed to use
 
-You don't need to install these yourself — see [Dependency Check](#dependency-check) below. `find` is also used, but it's a core system tool that's virtually always already present.
+You don't need to install these yourself see [Dependency Check](#dependency-check) below. `find` is also used, but it's a core system tool that's virtually always already present.
 
 > **Important:** Make sure your font contains numbers (`0–9`) and the symbols you need. Some decorative fonts may not contain every glyph.
 
@@ -44,7 +44,7 @@ Each family is a small JSON file that points to an `assetId` for the font file i
 3. Rewrites the `assetId` in every **non-emoji** family JSON to point at your font file instead.
 4. Leaves any family with `emoji` or `twemoji` in its filename completely untouched, so Roblox's emoji rendering keeps working normally.
 
-Because Sober reads the asset overlay on top of the real APK, none of this touches the original Roblox files — it can be undone at any time by clearing the overlay or restoring a backup.
+Because Sober reads the asset overlay on top of the real APK, none of this touches the original Roblox files it can be undone at any time by clearing the overlay or restoring a backup.
 
 ## Usage
 
@@ -68,9 +68,9 @@ On startup, the script checks for `unzip`, `python3`, `sed`, and `find`. If ever
 
 ### Choosing a Font
 
-Put your `.ttf`, `.otf`, or `.ttc` file anywhere inside `~/Downloads` — including subfolders — then run the script and choose option `[1]`. It will list every font it finds, with its path relative to `~/Downloads` so files with the same name in different folders are easy to tell apart. Pick a number, confirm, and it does the rest.
+Put your `.ttf`, `.otf`, or `.ttc` file anywhere inside `~/Downloads` including subfolders then run the script and choose option `[1]`. It will list every font it finds, with its path relative to `~/Downloads` so files with the same name in different folders are easy to tell apart. Pick a number, confirm, and it does the rest.
 
-You'll be asked if you want to back up your current fonts first — recommended, especially the first time.
+You'll be asked if you want to back up your current fonts first recommended, especially the first time.
 
 ### Restoring a Backup
 
@@ -78,7 +78,7 @@ Run the script again and choose option `[2]` to see a list of previous backups (
 
 ### Cleaning Up
 
-Once you're done, the script offers to delete the cloned repo folder for you, since it's no longer needed after the font has been installed. This is optional — say no to keep it around in case you want to change fonts again later.
+Once you're done, the script offers to delete the cloned repo folder for you, since it's no longer needed after the font has been installed. This is optional say no to keep it around in case you want to change fonts again later.
 
 ## Notes
 
